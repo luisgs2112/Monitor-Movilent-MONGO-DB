@@ -71,7 +71,7 @@
                                         <div class="font-semibold">
                                             <!-- Icono del OS con Tooltip -->
                                             <span title="{{ $device->os_info }}" class="cursor-help mr-1 text-lg">
-                                                {{ $device->os_icon }}
+                                                <i class="{{ $device->os_icon }}"></i>
                                             </span>
                                             <a href="{{ route('devices.show', $device) }}" class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300 hover:underline">
                                                 {{ $device->name }}
@@ -108,10 +108,21 @@
                                         @endif
                                     </td>
                                     <td class="px-5 py-5 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm">
-                                        @if($device->uptime)
-                                            <!-- Limpiamos el formato (12345) 10:00:00 para mostrar solo el tiempo -->
-                                            <span class="text-gray-700 dark:text-white font-mono text-xs">
-                                                {{ Str::after($device->uptime, ') ') }}
+                                        @if($device->uptime && $device->last_checked_at)
+                                            @php
+                                                
+                                                $currentUptime = $device->uptime_seconds + now()->diffInSeconds($device->last_checked_at);
+
+                                                
+                                                $d = floor($currentUptime / 86400);
+                                                $h = floor(($currentUptime % 86400) / 3600);
+                                                $m = floor(($currentUptime % 3600) / 60);
+                                                $s = $currentUptime % 60;
+                                                $formatted = sprintf('%02d:%02d:%02d', $h, $m, $s);
+                                                $displayUptime = $d > 0 ? "{$d}d {$formatted}" : $formatted;
+                                            @endphp
+                                            <span class="live-uptime text-gray-700 dark:text-white font-mono text-xs" data-seconds="{{ $currentUptime }}">
+                                                {{ $displayUptime }}
                                             </span>
                                         @else
                                             <span class="text-gray-400 text-xs">-</span>
@@ -148,151 +159,42 @@
         </div>
     </div>
 
-    <!-- Notificación Emergente (Toast) estilo YouTube -->
-    <div id="toast-notification" class="fixed bottom-5 right-5 bg-white dark:bg-gray-800 border-l-4 border-red-600 text-gray-900 dark:text-gray-100 px-6 py-4 rounded-lg shadow-2xl transform transition-all duration-500 translate-y-32 opacity-0 flex items-center gap-4 z-50 max-w-md border border-gray-200 dark:border-gray-700">
-        <div class="text-red-500 text-2xl">
-            🔔
-        </div>
-        <div>
-            <h4 class="font-bold text-gray-800 dark:text-gray-200">¡Dispositivo Desconectado!</h4>
-            <p id="toast-message" class="text-sm text-gray-600 dark:text-gray-400 mt-1">Dispositivo desconectado.</p>
-        </div>
-        <button onclick="document.getElementById('toast-notification').classList.add('translate-y-32', 'opacity-0')" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 ml-auto">
-            ✕
-        </button>
-    </div>
-
     <script>
-        // Configuración de Audio Global
-        const alertSound = new Audio("{{ asset('alert.mp3') }}");
-        
-        // Recuperar preferencia guardada (Persistencia)
-        let isAudioEnabled = localStorage.getItem('audio_enabled') === 'true';
+        (function() {
+            const startTicker = () => {
+                
+                if (window.uptimeInterval) clearInterval(window.uptimeInterval);
 
-        // Botón para "desbloquear" el audio en el navegador
-        const btnAudio = document.getElementById('btn-enable-audio');
-
-        // Función para actualizar visualmente el botón
-        function updateButtonUI() {
-            if (isAudioEnabled) {
-                btnAudio.innerHTML = '🔊 Sonido Activado';
-                btnAudio.className = 'ml-3 flex items-center text-xs bg-green-100 dark:bg-green-900 hover:bg-green-200 dark:hover:bg-green-800 text-green-800 dark:text-green-100 px-3 py-1 rounded-full transition-colors border border-green-200 dark:border-green-700 cursor-pointer';
-            } else {
-                btnAudio.innerHTML = '🔇 Activar Sonido';
-                btnAudio.className = 'ml-3 flex items-center text-xs bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 px-3 py-1 rounded-full transition-colors cursor-pointer';
-            }
-        }
-
-        // Inicializar estado del botón al cargar la página
-        updateButtonUI();
-
-        btnAudio.addEventListener('click', function() {
-            if (isAudioEnabled) {
-                isAudioEnabled = false;
-                localStorage.setItem('audio_enabled', 'false');
-                updateButtonUI();
-            } else {
-                alertSound.play().then(() => {
-                    alertSound.pause();
-                    alertSound.currentTime = 0;
-                    isAudioEnabled = true;
-                    localStorage.setItem('audio_enabled', 'true');
-                    updateButtonUI();
-                }).catch(e => {
-                    console.error("Error activando audio:", e);
-                    alert("No se pudo activar el audio.\n\nPosible causa: El archivo 'alert.mp3' no se encuentra en la carpeta 'public' o el formato no es compatible.");
-                });
-            }
-        });
-
-        // Actualización automática "silenciosa" cada 5 segundos
-        setInterval(function() {
-            console.log('Iniciando chequeo de actualización...');
-            
-            // Si hay una búsqueda activa, no actualizamos para no interrumpir lo que escribes
-            if (window.location.search.includes('search')) return;
-
-            // Agregamos un timestamp para evitar que el navegador use caché y traiga datos viejos
-            const url = new URL(window.location.href);
-            url.searchParams.set('_t', new Date().getTime());
-
-            fetch(url.toString(), { 
-                headers: { "X-Requested-With": "XMLHttpRequest" },
-                credentials: 'include',
-                cache: 'no-store'
-            })
-                .then(response => response.text())
-                .then(html => {
-                    // Convertimos el texto recibido en un documento HTML virtual
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(html, 'text/html');
-                    
-                    // 1. Actualizar el cuerpo de la tabla (tbody)
-                    // Usamos tbody para ser más específicos y evitar reemplazar encabezados
-                    const newTbody = doc.querySelector('#devices-table tbody');
-                    const currentTbody = document.querySelector('#devices-table tbody');
-                    
-                    if (newTbody && currentTbody) {
-                        if (newTbody.innerHTML !== currentTbody.innerHTML) {
-                            console.log('Cambios detectados en los dispositivos. Actualizando vista...');
-                            currentTbody.innerHTML = newTbody.innerHTML;
-                            
-                            // Efecto visual de actualización
-                            const tableContainer = document.getElementById('devices-table');
-                            tableContainer.style.transition = 'opacity 0.2s';
-                            tableContainer.style.opacity = '0.5';
-                            setTimeout(() => tableContainer.style.opacity = '1', 200);
-                        }
-                    } else if (!newTbody) {
-                        console.error('Error: No se encontró la tabla en la respuesta. Es posible que la sesión haya expirado o se haya redirigido al login.');
-                    }
-
-                    // 2. Actualizar Indicador de Tiempo
-                    const now = new Date();
-                    document.getElementById('live-status').innerText = 'Actualizado: ' + now.toLocaleTimeString();
-
-                    // --- Lógica de Notificación Sonora ---
-                    const newBell = doc.querySelector('#notification-bell');
-                    const currentBell = document.querySelector('#notification-bell');
-
-                    if (newBell && currentBell) {
-                        const newCount = parseInt(newBell.getAttribute('data-count') || '0');
-                        const currentCount = parseInt(currentBell.getAttribute('data-count') || '0');
-
-                        // Si hay más notificaciones que antes, sonar alarma y mostrar mensaje
-                        if (newCount > currentCount) {
-                            console.log('¡ALERTA! Nueva notificación detectada (' + currentCount + ' -> ' + newCount + ').');
-                            
-                            // Reproducir sonido solo si el usuario lo habilitó
-                            if (isAudioEnabled) {
-                                alertSound.play()
-                                    .then(() => console.log('Sonido reproducido correctamente.'))
-                                    .catch(e => console.error('Error al reproducir sonido:', e));
-                            }
-
-                            // Mostrar Toast Visual
-                            const message = newBell.getAttribute('data-latest-message');
-                            const toast = document.getElementById('toast-notification');
-                            const toastMsg = document.getElementById('toast-message');
-                            
-                            if (toast && message) {
-                                toastMsg.textContent = message;
-                                toast.classList.remove('translate-y-32', 'opacity-0'); // Mostrar (deslizar hacia arriba)
-                                
-                                // Ocultar automáticamente después de 8 segundos
-                                setTimeout(() => {
-                                    toast.classList.add('translate-y-32', 'opacity-0');
-                                }, 8000);
-                            }
-                        }
+                window.uptimeInterval = setInterval(() => {
+                    document.querySelectorAll('.live-uptime').forEach(el => {
+                        let totalSeconds = parseInt(el.getAttribute('data-seconds'));
                         
-                        // Actualizar el icono de la campana (para que aparezca el punto rojo sin recargar)
-                        currentBell.innerHTML = newBell.innerHTML;
-                        currentBell.setAttribute('data-count', newCount);
-                        currentBell.setAttribute('data-latest-message', newBell.getAttribute('data-latest-message'));
-                    }
-                })
-                .catch(error => console.error('Error actualizando tabla:', error));
-        }, 5000); // Consulta cada 5 segundos
+                        
+                        if (isNaN(totalSeconds)) return;
+                        
+                        totalSeconds++;
+                        el.setAttribute('data-seconds', totalSeconds);
+
+                        const days = Math.floor(totalSeconds / 86400);
+                        const hours = Math.floor((totalSeconds % 86400) / 3600);
+                        const minutes = Math.floor((totalSeconds % 3600) / 60);
+                        const seconds = totalSeconds % 60;
+
+                        const timeStr = [hours, minutes, seconds]
+                            .map(v => v.toString().padStart(2, '0'))
+                            .join(':');
+                        
+                        el.innerText = days > 0 ? `${days}d ${timeStr}` : timeStr;
+                    });
+                }, 1000);
+            };
+
+            
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', startTicker);
+            } else {
+                startTicker();
+            }
+        })();
     </script>
 </x-app-layout>

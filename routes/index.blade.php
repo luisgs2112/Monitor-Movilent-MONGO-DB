@@ -19,6 +19,31 @@
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900">
+                    
+                    {{-- Sección de Dispositivos Offline (Agregada) --}}
+                    @if(isset($offlineDevices) && $offlineDevices->count() > 0)
+                        <div class="mb-8">
+                            <h3 class="text-lg font-bold text-red-600 mb-4">🚨 Dispositivos Caídos (Offline)</h3>
+                            <div class="bg-red-50 border border-red-200 rounded-lg overflow-hidden">
+                                <ul class="divide-y divide-red-200">
+                                    @foreach($offlineDevices as $device)
+                                        <li class="p-4 flex items-center justify-between hover:bg-red-100 transition">
+                                            <div class="flex items-center">
+                                                {{-- AQUÍ ESTÁ LA SOLUCIÓN: Usar la etiqueta <i> --}}
+                                                <i class="{{ $device->os_icon }} text-2xl text-gray-600 mr-4 w-8 text-center"></i>
+                                                <div>
+                                                    <p class="font-bold text-gray-800">{{ $device->name }}</p>
+                                                    <p class="text-sm text-gray-600">{{ $device->ip_address }}</p>
+                                                </div>
+                                            </div>
+                                            <span class="px-3 py-1 text-xs font-semibold text-red-700 bg-red-200 rounded-full">Offline</span>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        </div>
+                    @endif
+
                     @if($notifications->count() > 0)
                         <ul class="divide-y divide-gray-200">
                             @foreach($notifications as $notification)

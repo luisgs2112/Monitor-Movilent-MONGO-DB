@@ -14,8 +14,8 @@ return new class extends Migration
         Schema::table('devices', function (Blueprint $table) {
             // Estado del dispositivo
             // unknown = nunca revisado, online = en línea, offline = caído
-            $table->string('status')->default('unknown')->after('is_active')->comment('Estado actual: online, offline, unknown');
-            $table->timestamp('last_checked_at')->nullable()->after('status')->comment('Fecha y hora del último escaneo');
+            $table->string('status')->default('unknown')->comment('Estado actual: online, offline, unknown');
+            $table->timestamp('last_checked_at')->nullable()->comment('Fecha y hora del último escaneo');
         });
     }
 

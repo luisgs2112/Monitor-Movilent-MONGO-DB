@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('devices', function (Blueprint $table) {
-            $table->string('uptime')->nullable()->after('status');
+            $table->string('uptime')->nullable();
         });
     }
 

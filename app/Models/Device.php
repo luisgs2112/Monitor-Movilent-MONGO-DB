@@ -3,7 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
+use MongoDB\Laravel\Eloquent\Model;
 
 class Device extends Model
 {
@@ -28,11 +28,27 @@ class Device extends Model
         'is_active' => 'boolean',
     ];
 
+    protected $attributes = [
+        'snmp_port' => 161,
+        'snmp_community' => 'public',
+        'type' => 'router',
+        'is_active' => true,
+        'status' => 'unknown',
+    ];
+
     
     
     public function office()
     {
         return $this->belongsTo(Office::class);
+    }
+
+    /**
+     * Asegurar que siempre haya una comunidad SNMP (fallback a 'public')
+     */
+    public function getSnmpCommunityAttribute($value)
+    {
+        return $value ?: 'public';
     }
 
     
@@ -84,34 +100,28 @@ class Device extends Model
     
     public function getSnmpUptime()
     {
-        
-        
-        if (!extension_loaded('snmp')) {
-            return "ERROR: Extensión SNMP desactivada en PHP";
-        }
+        if (!extension_loaded('snmp')) return null;
 
-        
-        
+        // Configuración robusta para Windows: Sin MIBs y valores planos
         putenv('MIBS=NONE');
-        
-        
-        putenv('MIBDIRS=' . str_replace('\\', '/', sys_get_temp_dir()));
+        snmp_set_valueretrieval(SNMP_VALUE_PLAIN);
+        snmp_set_oid_output_format(SNMP_OID_OUTPUT_NUMERIC);
 
-        
-        
-        
-        
         try {
-            
-            
-            
-            
-            $output = @snmp2_get($this->ip_address, $this->snmp_community, '.1.3.6.1.2.1.1.3.0', 1000000, 2);
+            // Timeout aumentado a 2s (2000000 us) y 3 reintentos
+            $output = @snmp2_get($this->ip_address, $this->snmp_community, '.1.3.6.1.2.1.1.3.0', 2000000, 3);
             
             if ($output !== false) {
+                // El valor viene en centésimas de segundo (TimeTicks)
+                $ticks = (int) $output;
+                $days = floor($ticks / (100 * 60 * 60 * 24));
+                $hours = floor(($ticks / (100 * 60 * 60)) % 24);
+                $minutes = floor(($ticks / (100 * 60)) % 60);
+                $seconds = floor(($ticks / 100) % 60);
                 
+                $timeStr = sprintf('%02d:%02d:%02d', $hours, $minutes, $seconds);
                 
-                return str_replace('Timeticks: ', '', $output);
+                return ($days > 0) ? "{$days}d {$timeStr}" : $timeStr;
             }
             return null; 
         } catch (\Throwable $e) {
@@ -125,20 +135,15 @@ class Device extends Model
     {
         if (!extension_loaded('snmp')) return null;
 
-        
-        
         putenv('MIBS=NONE');
-        putenv('MIBDIRS=' . str_replace('\\', '/', sys_get_temp_dir()));
+        snmp_set_valueretrieval(SNMP_VALUE_PLAIN);
+        snmp_set_oid_output_format(SNMP_OID_OUTPUT_NUMERIC);
 
-        
-        
         try {
-            $output = @snmp2_get($this->ip_address, $this->snmp_community, '.1.3.6.1.2.1.1.1.0', 1000000, 2);
+            $output = @snmp2_get($this->ip_address, $this->snmp_community, '.1.3.6.1.2.1.1.1.0', 2000000, 3);
             
             if ($output !== false) {
-                
-                
-                return str_replace(['STRING: ', '"'], '', $output);
+                return trim(str_replace('"', '', $output));
             }
             return null;
         } catch (\Throwable $e) {
@@ -151,27 +156,19 @@ class Device extends Model
     public function getSnmpCpuUsage()
     {
         if (!extension_loaded('snmp')) return null;
-        
-        
-        
+
         putenv('MIBS=NONE');
-        putenv('MIBDIRS=' . str_replace('\\', '/', sys_get_temp_dir()));
+        snmp_set_valueretrieval(SNMP_VALUE_PLAIN);
+        snmp_set_oid_output_format(SNMP_OID_OUTPUT_NUMERIC);
 
         try {
-            
-            
-            
-            
-            $output = @snmp2_walk($this->ip_address, $this->snmp_community, '.1.3.6.1.2.1.25.3.3.1.2', 1000000, 2);
+            $output = @snmp2_walk($this->ip_address, $this->snmp_community, '.1.3.6.1.2.1.25.3.3.1.2', 2000000, 3);
 
             if ($output && is_array($output) && count($output) > 0) {
                 $total = 0;
                 $count = 0;
                 foreach ($output as $line) {
-                    
-                    
-                    $value = (int) str_replace('INTEGER: ', '', $line);
-                    $total += $value;
+                    $total += (int) $line;
                     $count++;
                 }
                 return $count > 0 ? round($total / $count, 2) : 0;
@@ -196,5 +193,25 @@ class Device extends Model
         if (str_contains($os, 'darwin') || str_contains($os, 'mac')) return 'fab fa-apple';
         
         return 'fas fa-desktop';
+    }
+
+    /**
+     * Convierte el string de uptime (ej: "2d 05:23:10") a segundos totales
+     */
+    public function getUptimeSecondsAttribute()
+    {
+        if (!$this->uptime) return 0;
+
+        // Extraer días, horas, minutos y segundos usando Expresiones Regulares
+        if (preg_match('/(?:(\d+)d\s)?(\d+):(\d+):(\d+)/', $this->uptime, $matches)) {
+            $days = isset($matches[1]) ? (int)$matches[1] : 0;
+            $hours = (int)$matches[2];
+            $minutes = (int)$matches[3];
+            $seconds = (int)$matches[4];
+
+            return ($days * 86400) + ($hours * 3600) + ($minutes * 60) + $seconds;
+        }
+
+        return 0;
     }
 }

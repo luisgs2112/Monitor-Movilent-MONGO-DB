@@ -41,7 +41,7 @@ Route::post('/login', function (Request $request) {
 Route::middleware('auth:sanctum')->group(function () {
     
     Route::get('/devices', function () {
-        $devices = Device::with('office:id,name')->get()->map(function ($device) {
+        $devices = Device::with('office:_id,name')->get()->map(function ($device) {
             return [
                 'id' => $device->id,
                 'name' => $device->name,
@@ -59,7 +59,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     
     Route::get('/devices/{id}', function ($id) {
-        $device = Device::with('office:id,name')->findOrFail($id);
+        $device = Device::with('office:_id,name')->findOrFail($id);
 
         
         $history = $device->histories()
@@ -95,15 +95,16 @@ Route::middleware('auth:sanctum')->group(function () {
             ->limit(20)
             ->get()
             ->map(function ($n) {
-                $data = json_decode($n->data, true);
-                $isCpu = str_contains($n->type, 'HighCpu');
+                $n = (array) $n;
+                $data = is_string($n['data']) ? json_decode($n['data'], true) : $n['data'];
+                $isCpu = str_contains($n['type'], 'HighCpu');
                 return [
-                    'id' => $n->id,
+                    'id' => (string) ($n['_id'] ?? $n['id']),
                     'type' => $isCpu ? 'cpu' : 'offline',
                     'title' => $isCpu ? 'CPU Crítico' : 'Dispositivo Offline',
                     'message' => $data['message'] ?? 'Alerta del sistema',
-                    'time' => \Carbon\Carbon::parse($n->created_at)->diffForHumans(),
-                    'created_at' => $n->created_at, 
+                    'time' => \Carbon\Carbon::parse($n['created_at'])->diffForHumans(),
+                    'created_at' => \Carbon\Carbon::parse($n['created_at'])->toDateTimeString(), 
                 ];
             });
         return response()->json($notifications);

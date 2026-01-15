@@ -9,6 +9,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Auth;
 
 Route::get('/', function () {
     return redirect()->route('login');
@@ -27,7 +28,10 @@ Route::get('/dashboard', function () {
     
     $offlineDevices = Device::with('office')->where('status', 'offline')->get();
 
-    return view('dashboard', compact('officesCount', 'usersCount', 'devicesCount', 'onlineCount', 'offlineCount', 'unknownCount', 'offlineDevices'));
+    // Obtener notificaciones paginadas para la vista
+    $notifications = Auth::user()->notifications()->paginate(10);
+
+    return view('dashboard', compact('officesCount', 'usersCount', 'devicesCount', 'onlineCount', 'offlineCount', 'unknownCount', 'offlineDevices', 'notifications'));
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {

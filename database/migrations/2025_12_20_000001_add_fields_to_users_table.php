@@ -13,9 +13,9 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table) {
             // Campos adicionales de usuario
-            $table->string('phone')->nullable()->after('email');
-            $table->enum('role', ['admin', 'operator'])->default('operator')->after('password');
-            $table->boolean('is_active')->default(true)->after('role');
+            $table->string('phone')->nullable();
+            $table->enum('role', ['admin', 'operator'])->default('operator');
+            $table->boolean('is_active')->default(true);
         });
     }
 

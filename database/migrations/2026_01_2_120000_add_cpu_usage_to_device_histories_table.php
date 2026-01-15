@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::table('device_histories', function (Blueprint $table) {
             // Agregamos la columna para guardar el % de CPU (puede ser nulo si no es un servidor)
-            $table->integer('cpu_usage')->nullable()->after('status');
+            $table->integer('cpu_usage')->nullable();
         });
     }
 

@@ -40,7 +40,7 @@
                         <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                             <div class="text-sm text-gray-500 dark:text-gray-400">Sistema Operativo</div>
                             <div class="text-lg font-bold mt-1 truncate" title="{{ $device->os_info }}">
-                                {{ $device->os_icon }} {{ Str::limit($device->os_info, 20) ?: 'N/A' }}
+                                <i class="{{ $device->os_icon }}"></i> {{ Str::limit($device->os_info, 20) ?: 'N/A' }}
                             </div>
                         </div>
                     </div>
