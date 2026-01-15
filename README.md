@@ -2,12 +2,12 @@
 
 Sistema para monitorear servidores y dispositivos de red en tiempo real. Detecta caídas (Ping) y analiza rendimiento (SNMP) con alertas automáticas.
 
-## 📋 Requisitos
+## Requisitos
 *   **PHP 8.1+** (Extensiones requeridas: `php_snmp`, `php_mongodb`, `php_fileinfo`)
 *   **Base de Datos:** MongoDB (Debe estar ejecutándose)
 *   **Herramientas:** Composer, Node.js & NPM
 
-## ⚙️ Instalación
+## Instalación
 
 1.  **Instalar dependencias**
     Descarga las librerías de Backend (Laravel, MongoDB) y Frontend (Tailwind, Vite):
